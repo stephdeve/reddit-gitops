@@ -2,8 +2,9 @@ pipeline {
     agent any
 
     environment {
-        APP_NAME   = "stephdeve/reddit-clone-pipeline-ci"
-        IMAGE_TAG  = "1.0.0-13" 
+        APP_NAME = "stephdeve/reddit-clone-pipeline-ci"
+        // Tag dynamique basé sur le numéro de build Jenkins
+        IMAGE_TAG = "1.0.0-${env.BUILD_NUMBER}"
     }
 
     stages {
@@ -25,12 +26,12 @@ pipeline {
             steps {
                 sh """
                     echo 'Avant modification:'
-                    cat deployment.yaml | grep image
+                    cat deployment.yaml | grep image || true
 
                     sed -i "s|image: .*|image: ${APP_NAME}:${IMAGE_TAG}|g" deployment.yaml
 
                     echo 'Après modification:'
-                    cat deployment.yaml | grep image
+                    cat deployment.yaml | grep image || true
                 """
             }
         }
@@ -40,12 +41,15 @@ pipeline {
                 sh """
                     git config --global user.name "stephdeve"
                     git config --global user.email "stephdeve6@gmail.com"
-                    git add deployment.yaml
-                    git commit -m "Updated Deployment Manifest to ${IMAGE_TAG}"
+                    git add deployment.yaml || true
+
+                    if git diff --cached --quiet; then
+                      echo 'Aucun changement à committer, on continue sans erreur.'
+                    else
+                      git commit -m "Updated Deployment Manifest to ${IMAGE_TAG}"
+                      git push https://github.com/stephdeve/reddit-gitops main
+                    fi
                 """
-                withCredentials([gitUsernamePassword(credentialsId: 'github', gitToolName: 'Default')]) {
-                    sh "git push https://github.com/stephdeve/reddit-gitops main"
-                }
             }
         }
     }
